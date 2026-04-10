@@ -1,0 +1,99 @@
+name: 📦 Extract Vanilla APKs Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      rom_url:
+        description: 'HyperOS ROM 下载链接 (卡刷包 .zip)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Setup Environment
+        run: |
+          echo "=== 1. 初始化环境 ==="
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update -qq
+          # 仅保留多线程下载和 7z，不再需要 Java 和 Apktool
+          sudo apt-get install -yqq aria2 p7zip-full
+          
+          # 赋予提取工具权限
+          chmod -R +x tools/
+
+      - name: Download ROM with Aria2
+        run: |
+          echo "📥 下载 ROM 中..."
+          aria2c -x16 -s16 -j$(nproc) -U "Mozilla/5.0" -d . "${{ github.event.inputs.rom_url }}" -o rom.zip
+
+      - name: Extract Payload and Partitions
+        run: |
+          echo "📦 提取 Payload..."
+          7z e rom.zip payload.bin > /dev/null
+          rm rom.zip
+          
+          echo "🛠️ 提取 System, Product, System_Ext..."
+          mkdir -p extracted_images
+          ./tools/payload_extract -s -o extracted_images -i payload.bin -X system,product,system_ext -T0
+          rm payload.bin
+
+      - name: Extract EROFS
+        run: |
+          echo "📂 解包 EROFS 镜像..."
+          mkdir -p system_files product_files system_ext_files
+          
+          cd system_files && sudo ../tools/extract.erofs -i ../extracted_images/system.img -x -s && cd ..
+          cd product_files && sudo ../tools/extract.erofs -i ../extracted_images/product.img -x -s && cd ..
+          cd system_ext_files && sudo ../tools/extract.erofs -i ../extracted_images/system_ext.img -x -s && cd ..
+          
+          sudo rm -rf extracted_images
+
+      - name: Collect Target APKs
+        run: |
+          echo "🔍 寻找并收集目标 APK..."
+          mkdir -p vanilla_apks
+          
+          # 屏蔽权限警告，直接使用 find 搜索并复制文件
+          sudo find product_files -type f -name "MSA.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
+          sudo find product_files -type f -name "MIUISecurityCenter.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
+          sudo find system_ext_files -type f -name "Settings.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
+          
+          echo "✅ 提取完成，包含以下文件："
+          ls -la vanilla_apks/
+
+      - name: Generate Release Tag
+        id: tag
+        run: echo "release_tag=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
+
+      - name: Upload Vanilla APKs to Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: Vanilla-APKs-${{ steps.tag.outputs.release_tag }}
+          name: "📦 原版 APK 纯提取 - ${{ steps.tag.outputs.release_tag }}"
+          body: |
+            ### 提取完成
+            **源 ROM**: ${{ github.event.inputs.rom_url }}
+            
+            ⚠️ **注意**: 这些是未经任何修改的官方原版 APK，仅供本地测试与分析使用。
+          files: vanilla_apks/*.apk
+          draft: false
+          prerelease: false
