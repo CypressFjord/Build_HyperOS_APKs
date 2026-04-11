@@ -1,2 +1,3 @@
-# -
-用来提取ROM中的文件
+#Build_HyperOS_APKs
+
+自动化构建提取部分HyperOS系统的系统APP
