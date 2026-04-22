@@ -74,6 +74,8 @@ jobs:
           
           # 屏蔽权限警告，直接使用 find 搜索并复制文件
           sudo find product_files -type f -name "MSA.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
+          sudo find product_files -type f -name "MiType.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
+          sudo find product_files -type f -name "OSBot.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
           sudo find product_files -type f -name "MIUISecurityCenter.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
           sudo find system_ext_files -type f -name "Settings.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
           
