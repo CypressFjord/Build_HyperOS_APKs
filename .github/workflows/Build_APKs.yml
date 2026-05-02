@@ -79,6 +79,8 @@ jobs:
           sudo find product_files -type f -name "MIUINotes.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
           sudo find product_files -type f -name "MIUISecurityCenter.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
           sudo find system_ext_files -type f -name "Settings.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
+          sudo find system_ext_files -type f -name "perfinit_bdsize_zram.conf" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
+          sudo find system_ext_files -type f -name "miui-wifi-service.jar" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
           
           echo "✅ 提取完成，包含以下文件："
           ls -la vanilla_apks/
