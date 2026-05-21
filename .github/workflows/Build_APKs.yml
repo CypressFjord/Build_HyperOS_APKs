@@ -1,4 +1,4 @@
-name: 📦 Extract Vanilla APKs Only
+name: 📦 Extract Hardcoded Files
 
 on:
   workflow_dispatch:
@@ -7,6 +7,12 @@ on:
         description: 'HyperOS ROM 下载链接 (卡刷包 .zip)'
         required: true
         type: string
+        
+# 👇 在这里直接填写你需要提取的文件名（支持通配符）
+# 如果提取单个文件，直接写文件名，例如 "MSA.apk" 
+# 如果需要提取多个，用空格隔开，例如 "MSA.apk Settings.apk"
+env:
+  TARGET_FILES: "myron.xml piano.xml audio_lowpower_app_list.xml init.qti.kernel.rc MSA.apk OSBot.apk MiType.apk MIUISecurityCenter.apk Settings.apk"
 
 permissions:
   contents: write
@@ -34,7 +40,6 @@ jobs:
           echo "=== 1. 初始化环境 ==="
           export DEBIAN_FRONTEND=noninteractive
           sudo apt-get update -qq
-          # 仅保留多线程下载和 7z，不再需要 Java 和 Apktool
           sudo apt-get install -yqq aria2 p7zip-full
           
           # 赋予提取工具权限
@@ -51,9 +56,9 @@ jobs:
           7z e rom.zip payload.bin > /dev/null
           rm rom.zip
           
-          echo "🛠️ 提取 System, Product, System_Ext..."
+          echo "🛠️ 提取 system,product,system_ext,vendor,odm"
           mkdir -p extracted_images
-          ./tools/payload_extract -s -o extracted_images -i payload.bin -X system,product,system_ext -T0
+          ./tools/payload_extract -s -o extracted_images -i payload.bin -X system,product,system_ext,vendor,odm-T0
           rm payload.bin
 
       - name: Extract EROFS
@@ -67,38 +72,38 @@ jobs:
           
           sudo rm -rf extracted_images
 
-      - name: Collect Target APKs
+      - name: Collect and Archive Target Files
         run: |
-          echo "🔍 寻找并收集目标 APK..."
-          mkdir -p vanilla_apks
+          echo "🔍 寻找并收集目标文件..."
+          mkdir -p extracted_target
           
-          # 屏蔽权限警告，直接使用 find 搜索并复制文件
-          sudo find product_files -type f -name "MSA.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
-          sudo find product_files -type f -name "MiType.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
-          sudo find product_files -type f -name "OSBot.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
-          sudo find product_files -type f -name "MIUINotes.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
-          sudo find product_files -type f -name "MIUISecurityCenter.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
-          sudo find system_ext_files -type f -name "Settings.apk" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
-          sudo find system_ext_files -type f -name "perfinit_bdsize_zram.conf" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
-          sudo find system_ext_files -type f -name "miui-wifi-service.jar" -exec cp {} vanilla_apks/ \; 2>/dev/null || true
+          # 直接读取代码顶部定义好的环境变量 TARGET_FILES
+          echo "当前配置的提取目标: ${TARGET_FILES}"
           
-          echo "✅ 提取完成，包含以下文件："
-          ls -la vanilla_apks/
+          for pattern in ${TARGET_FILES}; do
+            echo "正在提取: $pattern"
+            sudo find system_files product_files system_ext_files -type f -name "$pattern" -exec cp --parents {} extracted_target/ \; 2>/dev/null || true
+          done
+          
+          echo "🗜️ 正在打包提取出的文件..."
+          cd extracted_target
+          7z a -tzip ../extracted_files.zip *
+          
+          echo "✅ 提取并打包完成！"
 
       - name: Generate Release Tag
         id: tag
         run: echo "release_tag=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
 
-      - name: Upload Vanilla APKs to Releases
+      - name: Upload Extracted Files to Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: Vanilla-APKs-${{ steps.tag.outputs.release_tag }}
-          name: "📦 原版 APK 纯提取 - ${{ steps.tag.outputs.release_tag }}"
+          tag_name: Extraction-${{ steps.tag.outputs.release_tag }}
+          name: "📦 文件提取 - ${{ steps.tag.outputs.release_tag }}"
           body: |
             ### 提取完成
             **源 ROM**: ${{ github.event.inputs.rom_url }}
-            
-            ⚠️ **注意**: 这些是未经任何修改的官方原版 APK，仅供本地测试与分析使用。
-          files: vanilla_apks/*.apk
+            **提取目标**: ${{ env.TARGET_FILES }}
+          files: extracted_files.zip
           draft: false
           prerelease: false
