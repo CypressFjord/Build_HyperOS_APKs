@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       file_patterns:
-        description: ' (多个用空格分隔，例如: *.apk *.jar *.conf MSA.apk)'
+        description: '(填写需要提取的文件，例如: *.apk *.jar *.conf *.apk)'
         required: true
         default: '*.apk *.jar'
         type: string
@@ -55,9 +55,9 @@ jobs:
           7z e rom.zip payload.bin > /dev/null
           rm rom.zip
           
-          echo "🛠️ 提取 System, Product, System_Ext..."
+          echo "🛠️ 提取system,product,system_ext,odm,mi_ext,vendor"
           mkdir -p extracted_images
-          ./tools/payload_extract -s -o extracted_images -i payload.bin -X system,product,system_ext -T0
+          ./tools/payload_extract -s -o extracted_images -i payload.bin -X system,product,system_ext,odm,mi_ext,vendor -T0
           rm payload.bin
 
       - name: Extract EROFS
