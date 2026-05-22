@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       file_patterns:
-        description: '要提取的文件匹配模式 (多个用空格分隔，例如: *.apk *.jar *.conf MSA.apk)'
+        description: ' (多个用空格分隔，例如: *.apk *.jar *.conf MSA.apk)'
         required: true
         default: '*.apk *.jar'
         type: string
