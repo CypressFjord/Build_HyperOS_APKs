@@ -1,4 +1,4 @@
-name: 📦 Extract Hardcoded Files
+name: 📦 Extract Custom Files
 
 on:
   workflow_dispatch:
@@ -7,12 +7,11 @@ on:
         description: 'HyperOS ROM 下载链接 (卡刷包 .zip)'
         required: true
         type: string
-        
-# 👇 在这里直接填写你需要提取的文件名（支持通配符）
-# 如果提取单个文件，直接写文件名，例如 "MSA.apk" 
-# 如果需要提取多个，用空格隔开，例如 "MSA.apk Settings.apk"
-env:
-  TARGET_FILES: "myron.xml piano.xml audio_lowpower_app_list.xml init.qti.kernel.rc MSA.apk OSBot.apk MiType.apk MIUISecurityCenter.apk Settings.apk"
+      file_patterns:
+        description: '要提取的文件匹配模式 (多个用空格分隔，例如: *.apk *.jar *.conf MSA.apk)'
+        required: true
+        default: '*.apk *.jar'
+        type: string
 
 permissions:
   contents: write
@@ -56,9 +55,9 @@ jobs:
           7z e rom.zip payload.bin > /dev/null
           rm rom.zip
           
-          echo "🛠️ 提取 system,product,system_ext,vendor,odm"
+          echo "🛠️ 提取 System, Product, System_Ext..."
           mkdir -p extracted_images
-          ./tools/payload_extract -s -o extracted_images -i payload.bin -X system,product,system_ext,vendor,odm-T0
+          ./tools/payload_extract -s -o extracted_images -i payload.bin -X system,product,system_ext -T0
           rm payload.bin
 
       - name: Extract EROFS
@@ -77,17 +76,19 @@ jobs:
           echo "🔍 寻找并收集目标文件..."
           mkdir -p extracted_target
           
-          # 直接读取代码顶部定义好的环境变量 TARGET_FILES
-          echo "当前配置的提取目标: ${TARGET_FILES}"
+          # 读取用户输入的文件匹配模式 (例如: *.apk *.jar)
+          PATTERNS="${{ github.event.inputs.file_patterns }}"
           
-          for pattern in ${TARGET_FILES}; do
-            echo "正在提取: $pattern"
+          # 遍历解包目录，按模式搜索。使用 cp --parents 保留相对目录结构，防止同名文件互相覆盖
+          for pattern in $PATTERNS; do
+            echo "正在提取匹配项: $pattern"
             sudo find system_files product_files system_ext_files -type f -name "$pattern" -exec cp --parents {} extracted_target/ \; 2>/dev/null || true
           done
           
           echo "🗜️ 正在打包提取出的文件..."
           cd extracted_target
-          7z a -tzip ../extracted_files.zip *
+          # 将提取的内容压缩成 ZIP 文件，方便下载
+          7z a -tzip ../extracted_custom_files.zip *
           
           echo "✅ 提取并打包完成！"
 
@@ -98,12 +99,14 @@ jobs:
       - name: Upload Extracted Files to Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: Extraction-${{ steps.tag.outputs.release_tag }}
-          name: "📦 文件提取 - ${{ steps.tag.outputs.release_tag }}"
+          tag_name: Custom-Extraction-${{ steps.tag.outputs.release_tag }}
+          name: "📦 自定义文件提取 - ${{ steps.tag.outputs.release_tag }}"
           body: |
             ### 提取完成
             **源 ROM**: ${{ github.event.inputs.rom_url }}
-            **提取目标**: ${{ env.TARGET_FILES }}
-          files: extracted_files.zip
+            **提取规则**: ${{ github.event.inputs.file_patterns }}
+            
+            ⚠️ **注意**: 这些是未经任何修改的官方原版文件，压缩包内已保留原文件在 ROM 中的路径结构。
+          files: extracted_custom_files.zip
           draft: false
           prerelease: false
