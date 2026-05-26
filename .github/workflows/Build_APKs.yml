@@ -10,7 +10,7 @@ on:
       file_patterns:
         description: '(填写需要提取的文件，例如: *.apk *.jar *.conf *.apk)'
         required: true
-        default: '*.apk *.jar'
+        default: 'myron.xml piano.xml audio_lowpower_app_list.xml init.qti.kernel.rc MSA.apk OSBot.apk MiType.apk MIUISecurityCenter.apk Settings.apk'
         type: string
 
 permissions:
